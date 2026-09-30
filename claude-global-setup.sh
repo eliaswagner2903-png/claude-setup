@@ -556,6 +556,7 @@ cat > "$Z/hooks/vor_werkzeug.py" <<'CLAUDE_SETUP_ENDE'
         vor git commit / git push den Diff als Kontext zeigen und gestagte Änderungen auf Secrets prüfen.
 Gibt nie Secret-Werte aus. Blockiert bei internen Fehlern nie."""
 import json
+import os
 import re
 import shlex
 import sys
@@ -610,15 +611,27 @@ def bearbeitung(daten):
                              ".gitignore steht – im Code nur den Variablennamen verwenden.")
 
 
+def git_ordner(cmd, standard):
+    """Repo des Befehls: `git -C X …` oder führendes `cd X &&`, sonst das Projekt; None, wenn kein Git-Repo."""
+    m = re.search(r"\bgit\s+-C\s+(\"[^\"]+\"|'[^']+'|\S+)", cmd) or re.match(r"\s*cd\s+(\"[^\"]+\"|'[^']+'|[^\s;&|]+)", cmd)
+    ordner = Path(os.path.expanduser(m.group(1).strip("\"'"))) if m else standard
+    if not ordner.is_absolute():
+        ordner = standard / ordner
+    code, _ = ausfuehren(["git", "rev-parse", "--show-toplevel"], ordner, 5)
+    return ordner if code == 0 else None
+
+
 def befehl(daten):
     cmd = (daten.get("tool_input") or {}).get("command") or ""
     for muster, grund in RISKANT:
         if re.search(muster, cmd, re.IGNORECASE):
             entscheidung("ask", f"Riskanter Befehl: {grund}. Bitte bestätigen.")
             return
-    wurzel = projekt(daten)
     if not re.search(GIT + r"(commit|push)\b", cmd):
         return
+    wurzel = git_ordner(cmd, projekt(daten))
+    if wurzel is None:
+        return  # kein Git-Repo erkennbar: lieber schweigen als Git-Hilfetext in den Kontext kippen
     ist_commit = re.search(GIT + r"commit\b", cmd)
     teile = []
     if ist_commit:
