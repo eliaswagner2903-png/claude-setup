@@ -77,7 +77,7 @@ cat > "$Z/agents/backend.md" <<'CLAUDE_SETUP_ENDE'
 name: backend
 description: Backend-Implementierung – APIs, Datenbanken, Authentifizierung, Serverlogik, Fehlerbehandlung, Security, Architektur. Einsetzen, wenn Server-Code, Endpunkte, Datenmodelle, Migrationen oder Auth betroffen sind.
 tools: Read, Edit, Write, Grep, Glob, Bash
-model: inherit
+model: sonnet
 ---
 
 Du bist ein erfahrener Backend-Entwickler.
@@ -107,7 +107,7 @@ cat > "$Z/agents/frontend.md" <<'CLAUDE_SETUP_ENDE'
 name: frontend
 description: Frontend-Implementierung – React, Next.js, HTML/CSS, Tailwind, Responsive Design, Barrierefreiheit, UI/UX. Einsetzen, wenn die Aufgabe hauptsächlich Komponenten, Styling, Layout oder Bedienung im Browser betrifft.
 tools: Read, Edit, Write, Grep, Glob, Bash, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_resize, mcp__playwright__browser_click, mcp__playwright__browser_console_messages
-model: inherit
+model: sonnet
 ---
 
 Du bist ein erfahrener Frontend-Entwickler.
@@ -136,7 +136,7 @@ cat > "$Z/agents/researcher.md" <<'CLAUDE_SETUP_ENDE'
 name: researcher
 description: Technische Recherche mit aktuellen Quellen. Einsetzen, wenn Library-/API-Versionen, aktuelle Dokumentation, Breaking Changes, Best Practices oder Vergleiche von Tools gebraucht werden – oder wenn Wissen veraltet sein könnte. Liefert kompakte, belegte Ergebnisse.
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch, mcp__context7__resolve-library-id, mcp__context7__query-docs
-model: inherit
+model: sonnet
 ---
 
 Du bist ein Recherche-Spezialist. Du änderst keinen Projektcode.
@@ -164,7 +164,7 @@ cat > "$Z/agents/reviewer.md" <<'CLAUDE_SETUP_ENDE'
 name: reviewer
 description: Unabhängiges Code-Review – findet Bugs, Security-Probleme, unnötige Komplexität, Performance-Probleme und schlechte Architektur und liefert konkrete Verbesserungen. Einsetzen, bevor größere Änderungen als abgeschlossen gelten, oder auf Wunsch für einen Diff/Branch/PR.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: sonnet
 ---
 
 Du bist ein erfahrener, unabhängiger Reviewer. Du änderst **keinen Code** – du prüfst und berichtest.
@@ -196,7 +196,7 @@ cat > "$Z/agents/tester.md" <<'CLAUDE_SETUP_ENDE'
 name: tester
 description: Systematisches Testen von Anwendungen und Features – Browserflows, Formulare, Navigation, Responsive-Verhalten, Fehlerfälle, Regressionen; nutzt Playwright. Einsetzen, wenn ein Feature oder eine Anwendung geprüft werden soll, bevor sie als fertig gilt.
 tools: Read, Grep, Glob, Bash, Write, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_resize, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_fill_form, mcp__playwright__browser_select_option, mcp__playwright__browser_press_key, mcp__playwright__browser_hover, mcp__playwright__browser_wait_for, mcp__playwright__browser_evaluate, mcp__playwright__browser_console_messages, mcp__playwright__browser_network_requests, mcp__playwright__browser_navigate_back, mcp__playwright__browser_tabs, mcp__playwright__browser_close, mcp__chrome-devtools__new_page, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__lighthouse_audit, mcp__chrome-devtools__performance_start_trace, mcp__chrome-devtools__performance_analyze_insight, mcp__chrome-devtools__performance_stop_trace, mcp__chrome-devtools__list_console_messages, mcp__chrome-devtools__list_network_requests
-model: inherit
+model: sonnet
 ---
 
 Du bist ein gründlicher QA-Ingenieur. Du änderst **keinen Anwendungscode** – du findest und belegst Fehler.
@@ -556,6 +556,7 @@ cat > "$Z/hooks/vor_werkzeug.py" <<'CLAUDE_SETUP_ENDE'
         vor git commit / git push den Diff als Kontext zeigen und gestagte Änderungen auf Secrets prüfen.
 Gibt nie Secret-Werte aus. Blockiert bei internen Fehlern nie."""
 import json
+import os
 import re
 import shlex
 import sys
@@ -610,15 +611,27 @@ def bearbeitung(daten):
                              ".gitignore steht – im Code nur den Variablennamen verwenden.")
 
 
+def git_ordner(cmd, standard):
+    """Repo des Befehls: `git -C X …` oder führendes `cd X &&`, sonst das Projekt; None, wenn kein Git-Repo."""
+    m = re.search(r"\bgit\s+-C\s+(\"[^\"]+\"|'[^']+'|\S+)", cmd) or re.match(r"\s*cd\s+(\"[^\"]+\"|'[^']+'|[^\s;&|]+)", cmd)
+    ordner = Path(os.path.expanduser(m.group(1).strip("\"'"))) if m else standard
+    if not ordner.is_absolute():
+        ordner = standard / ordner
+    code, _ = ausfuehren(["git", "rev-parse", "--show-toplevel"], ordner, 5)
+    return ordner if code == 0 else None
+
+
 def befehl(daten):
     cmd = (daten.get("tool_input") or {}).get("command") or ""
     for muster, grund in RISKANT:
         if re.search(muster, cmd, re.IGNORECASE):
             entscheidung("ask", f"Riskanter Befehl: {grund}. Bitte bestätigen.")
             return
-    wurzel = projekt(daten)
     if not re.search(GIT + r"(commit|push)\b", cmd):
         return
+    wurzel = git_ordner(cmd, projekt(daten))
+    if wurzel is None:
+        return  # kein Git-Repo erkennbar: lieber schweigen als Git-Hilfetext in den Kontext kippen
     ist_commit = re.search(GIT + r"commit\b", cmd)
     teile = []
     if ist_commit:
