@@ -3,7 +3,7 @@
 Globale Claude-Code-Umgebung für Cloud-Sitzungen (claude.ai/code):
 
 - `~/.claude/CLAUDE.md` – Arbeitsregeln für jedes Projekt
-- 5 Subagents: `researcher`, `frontend`, `backend`, `tester`, `reviewer`
+- 5 Subagents: `researcher`, `frontend`, `backend`, `tester`, `reviewer` (Modell sonnet, spart Credits gegenüber Opus)
 - Hooks: formatieren/linten mit Projektwerkzeugen, Secret-Schutz, Audit bei Dependency-Änderungen,
   Diff vor Commit/Push, Rückfrage bei riskanten Befehlen, optionaler Schnelltest (`.claude/quick-test`)
 - MCPs: Playwright, Chrome DevTools (lokal, feste Versionen), Context7 (wenn erreichbar)
