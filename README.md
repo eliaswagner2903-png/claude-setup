@@ -1,22 +1,22 @@
 # claude-setup
 
-Globale Claude-Code-Umgebung für Cloud-Sitzungen (claude.ai/code):
+Global Claude Code environment for cloud sessions (claude.ai/code):
 
-- `~/.claude/CLAUDE.md` – Arbeitsregeln für jedes Projekt
-- 5 Subagents: `researcher`, `frontend`, `backend`, `tester`, `reviewer` (Modell sonnet, spart Credits gegenüber Opus)
-- Hooks: formatieren/linten mit Projektwerkzeugen, Secret-Schutz, Audit bei Dependency-Änderungen,
-  Diff vor Commit/Push, Rückfrage bei riskanten Befehlen, optionaler Schnelltest (`.claude/quick-test`)
-- MCPs: Playwright, Chrome DevTools (lokal, feste Versionen), Context7 (wenn erreichbar)
+- `~/.claude/CLAUDE.md` – working rules for every project
+- 5 subagents: `researcher`, `frontend`, `backend`, `tester`, `reviewer` (model sonnet, saves credits compared to Opus)
+- Hooks: format/lint with the project's own tools, secret protection, audit on dependency changes,
+  diff before commit/push, confirmation prompt for risky commands, optional quick test (`.claude/quick-test`)
+- MCPs: Playwright, Chrome DevTools (local, pinned versions), Context7 (if reachable)
 
-Enthält keine Secrets. Das Skript ist idempotent und ersetzt nur seine eigenen Einträge.
+Contains no secrets. The script is idempotent and only replaces its own entries.
 
-## Einrichtung
+## Setup
 
-In den Einstellungen der Cloud-Umgebung (im Browser: Umgebung → Bearbeiten → **Setup script**) genau diese Zeile:
+In the cloud environment settings (in the browser: Environment → Edit → **Setup script**) enter exactly this line:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/eliaswagner2903-png/claude-setup/main/claude-global-setup.sh | bash
 ```
 
-Neue Sitzungen laden damit immer den aktuellen Stand dieses Repositorys. Kontrolle in einer Sitzung: `/agents`, `/mcp`,
-Protokoll unter `~/.claude/global-setup.log`.
+New sessions then always load the current state of this repository. To check inside a session: `/agents`, `/mcp`,
+log at `~/.claude/global-setup.log`.
